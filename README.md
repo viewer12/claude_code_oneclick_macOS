@@ -114,6 +114,12 @@ echo "${ANTHROPIC_AUTH_TOKEN:0:8}********"
 
 本仓库提供卸载脚本：`claude_code_oneclick_uninstall.sh`
 
+先下载卸载脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/viewer12/claude_code_oneclick_macOS/main/claude_code_oneclick_uninstall.sh -o claude_code_oneclick_uninstall.sh
+```
+
 ```bash
 chmod +x claude_code_oneclick_uninstall.sh
 ./claude_code_oneclick_uninstall.sh
