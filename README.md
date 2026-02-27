@@ -64,6 +64,20 @@ claude
 
 启动后输入 `/mcp` 可查看所有 MCP 工具状态。
 
+## 🗑️ 卸载方法（仅卸载 Claude Code + MCP）
+
+本仓库提供卸载脚本：`claude_code_oneclick_uninstall.sh`
+
+```bash
+chmod +x claude_code_oneclick_uninstall.sh
+./claude_code_oneclick_uninstall.sh
+```
+
+说明：
+- 会移除 Claude Code CLI
+- 会移除 5 个 MCP（用户级和项目级配置）
+- **不会**卸载 Homebrew / Node.js / Python / uv 等依赖
+
 ## ⚠️ 注意事项
 
 - **Xcode Command Line Tools**：首次运行时，macOS 会弹出安装窗口，请点击"安装"。安装完成后重新运行本脚本。
