@@ -19,6 +19,9 @@
 4. **memory** - 跨会话持久记忆，Claude 能记住你的偏好
 5. **sequential-thinking** - 结构化思维拆解，帮助分析复杂问题
 
+**MCP 安装范围：**
+- **用户级（全局）**：安装后在任意项目、任意终端启动 Claude Code 都可用
+
 ## ✅ 系统要求
 
 - **操作系统**：macOS 13 Ventura 或更新版本

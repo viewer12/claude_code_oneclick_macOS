@@ -136,123 +136,57 @@ retry() {
 
 mcp_exists() {
   local name="$1"
-  local project="$2"
   if [ ! -f "$HOME/.claude.json" ]; then return 1; fi
-  CLAUDE_CHECK_NAME="$name" CLAUDE_CHECK_PROJECT="$project" python3 - <<'PY'
+  CLAUDE_CHECK_NAME="$name" python3 - <<'PY'
 import json, os, sys
 path = os.path.expanduser("~/.claude.json")
 name = os.environ.get("CLAUDE_CHECK_NAME", "")
-project = os.environ.get("CLAUDE_CHECK_PROJECT", "")
 try:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    servers = data.get("projects", {}).get(project, {}).get("mcpServers", {})
+    servers = data.get("mcpServers", {})
     sys.exit(0 if name in servers else 1)
 except Exception:
     sys.exit(1)
 PY
 }
 
-# 注册用 npx 启动的 MCP，并将 node/npx 改写为绝对路径
-# 用法: register_npx_mcp <名称> <npm包> <项目目录> <node绝对路径> <npx绝对路径> [额外参数...]
+# 注册用 npx 启动的 MCP（用户级，全局）
+# 用法: register_npx_mcp <名称> <npm包> <npx绝对路径> [额外参数...]
 register_npx_mcp() {
   local name="$1"
   local pkg="$2"
-  local project="$3"
-  local node_abs="$4"
-  local npx_abs="$5"
-  shift 5
+  local npx_abs="$3"
+  shift 3
 
-  if mcp_exists "$name" "$project"; then
-    warn "${name} MCP 已存在，先移除再重新注册..."
-    claude mcp remove "$name" 2>/dev/null || true
+  if mcp_exists "$name"; then
+    warn "${name}（用户级）MCP 已存在，先移除再重新注册..."
+    claude mcp remove "$name" --scope user 2>/dev/null || claude mcp remove "$name" 2>/dev/null || true
   fi
 
-  info "注册 ${name}：npx -y ${pkg} $*"
+  info "注册 ${name}（用户级）：${npx_abs} -y ${pkg} $*"
   if [ $# -gt 0 ]; then
-    claude mcp add "$name" -- npx -y "$pkg" "$@"
+    claude mcp add "$name" --scope user -- "$npx_abs" -y "$pkg" "$@"
   else
-    claude mcp add "$name" -- npx -y "$pkg"
+    claude mcp add "$name" --scope user -- "$npx_abs" -y "$pkg"
   fi
-
-  # 改写为 node/npx 绝对路径，确保 Claude Code 启动时不依赖 PATH
-  CLAUDE_RW_NAME="$name" \
-  CLAUDE_RW_PROJECT="$project" \
-  CLAUDE_RW_NODE="$node_abs" \
-  CLAUDE_RW_NPX="$npx_abs" \
-  python3 - <<'PY'
-import json, os, sys
-path    = os.path.expanduser("~/.claude.json")
-name    = os.environ["CLAUDE_RW_NAME"]
-project = os.environ["CLAUDE_RW_PROJECT"]
-node    = os.environ["CLAUDE_RW_NODE"]
-npx     = os.environ["CLAUDE_RW_NPX"]
-try:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-except Exception as e:
-    print(f"读取失败：{e}", file=sys.stderr); sys.exit(1)
-proj = data.setdefault("projects", {}).setdefault(project, {})
-srv  = proj.setdefault("mcpServers", {}).setdefault(name, {})
-srv["type"]    = "stdio"
-srv["command"] = node
-args = srv.get("args", [])
-if args:
-    args[0] = npx
-else:
-    args = [npx, "-y", name]
-srv["args"] = args
-srv.setdefault("env", {})
-with open(path, "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=2)
-print(f"OK: {name} 已改写为 node/npx 绝对路径")
-PY
   ok "${name} MCP 注册完成。"
 }
 
-# 注册用 uvx 启动的 MCP（Python 包），并将 uvx 改写为绝对路径
-# 用法: register_uvx_mcp <名称> <PyPI包名> <项目目录> <uvx绝对路径>
+# 注册用 uvx 启动的 MCP（用户级，全局）
+# 用法: register_uvx_mcp <名称> <PyPI包名> <uvx绝对路径>
 register_uvx_mcp() {
   local name="$1"
   local pkg="$2"
-  local project="$3"
-  local uvx_abs="$4"
+  local uvx_abs="$3"
 
-  if mcp_exists "$name" "$project"; then
-    warn "${name} MCP 已存在，先移除再重新注册..."
-    claude mcp remove "$name" 2>/dev/null || true
+  if mcp_exists "$name"; then
+    warn "${name}（用户级）MCP 已存在，先移除再重新注册..."
+    claude mcp remove "$name" --scope user 2>/dev/null || claude mcp remove "$name" 2>/dev/null || true
   fi
 
-  info "注册 ${name}：uvx ${pkg}"
-  claude mcp add "$name" -- uvx "$pkg"
-
-  # 改写为 uvx 绝对路径，避免 Claude Code 启动时因 PATH 缺失找不到 uvx
-  CLAUDE_RW_NAME="$name" \
-  CLAUDE_RW_PROJECT="$project" \
-  CLAUDE_RW_UVX="$uvx_abs" \
-  CLAUDE_RW_PKG="$pkg" \
-  python3 - <<'PY'
-import json, os, sys
-path    = os.path.expanduser("~/.claude.json")
-name    = os.environ["CLAUDE_RW_NAME"]
-project = os.environ["CLAUDE_RW_PROJECT"]
-uvx     = os.environ["CLAUDE_RW_UVX"]
-pkg     = os.environ["CLAUDE_RW_PKG"]
-try:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-except Exception as e:
-    print(f"读取失败：{e}", file=sys.stderr); sys.exit(1)
-proj = data.setdefault("projects", {}).setdefault(project, {})
-srv  = proj.setdefault("mcpServers", {}).setdefault(name, {})
-srv["type"]    = "stdio"
-srv["command"] = uvx
-srv["args"]    = [pkg]
-srv.setdefault("env", {})
-with open(path, "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=2)
-print(f"OK: {name} 已改写为 uvx 绝对路径")
-PY
+  info "注册 ${name}（用户级）：${uvx_abs} ${pkg}"
+  claude mcp add "$name" --scope user -- "$uvx_abs" "$pkg"
   ok "${name} MCP 注册完成。"
 }
 
@@ -515,13 +449,11 @@ install_or_update_claude() {
 }
 
 install_all_mcp() {
-  next_step "安装 5 个 MCP 工具（按官方第一推荐方式启动）"
+  next_step "安装 5 个 MCP 工具（用户级，全局可用）"
 
-  local PROJECT
   local NODE_ABS
   local NPX_ABS
   local UVX_ABS
-  PROJECT="$(pwd)"
   NODE_ABS="$(find_node_absolute 2>/dev/null || command -v node 2>/dev/null || true)"
   NPX_ABS="$(find_npx_absolute 2>/dev/null || command -v npx 2>/dev/null || true)"
   UVX_ABS="$(find_uvx_absolute 2>/dev/null || command -v uvx 2>/dev/null || true)"
@@ -535,37 +467,33 @@ install_all_mcp() {
     exit 5
   fi
 
-  ok "项目目录：$PROJECT"
+  ok "MCP 安装范围：用户级（跨项目可用）"
   ok "node    ：$NODE_ABS（$("$NODE_ABS" -v)）"
   ok "npx     ：$NPX_ABS"
   ok "uvx     ：$UVX_ABS"
 
   # ── 1. Playwright ── TypeScript 服务器，官方推荐 npx ──────────────────────
   info "── [1/5] Playwright（npx）：控制浏览器，截图、填表、自动化网页操作 ──"
-  register_npx_mcp "playwright" "@playwright/mcp@latest" \
-    "$PROJECT" "$NODE_ABS" "$NPX_ABS"
+  register_npx_mcp "playwright" "@playwright/mcp@latest" "$NPX_ABS"
 
   # ── 2. Fetch ── Python 服务器，官方推荐 uvx ───────────────────────────────
   info "── [2/5] Fetch（uvx）：抓取任意网页内容给 Claude 阅读 ──"
-  register_uvx_mcp "fetch" "mcp-server-fetch" \
-    "$PROJECT" "$UVX_ABS"
+  register_uvx_mcp "fetch" "mcp-server-fetch" "$UVX_ABS"
 
   # ── 3. Filesystem ── TypeScript 服务器，官方推荐 npx ─────────────────────
   # 授权桌面和下载目录，PM 日常最常用的两个位置
   info "── [3/5] Filesystem（npx）：读写本地文件（桌面 + 下载） ──"
   register_npx_mcp "filesystem" "@modelcontextprotocol/server-filesystem" \
-    "$PROJECT" "$NODE_ABS" "$NPX_ABS" \
-    "$HOME/Desktop" "$HOME/Downloads"
+    "$NPX_ABS" "$HOME/Desktop" "$HOME/Downloads"
 
   # ── 4. Memory ── TypeScript 服务器，官方推荐 npx ─────────────────────────
   info "── [4/5] Memory（npx）：跨会话持久记忆，Claude 能记住你的偏好和背景 ──"
-  register_npx_mcp "memory" "@modelcontextprotocol/server-memory" \
-    "$PROJECT" "$NODE_ABS" "$NPX_ABS"
+  register_npx_mcp "memory" "@modelcontextprotocol/server-memory" "$NPX_ABS"
 
   # ── 5. Sequential Thinking ── TypeScript 服务器，官方推荐 npx ────────────
   info "── [5/5] Sequential Thinking（npx）：结构化思维拆解，分析复杂问题 ──"
   register_npx_mcp "sequential-thinking" "@modelcontextprotocol/server-sequential-thinking" \
-    "$PROJECT" "$NODE_ABS" "$NPX_ABS"
+    "$NPX_ABS"
 
   ok "5 个 MCP 工具全部注册完成。"
   info "当前 MCP 列表："
