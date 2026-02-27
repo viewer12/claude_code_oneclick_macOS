@@ -64,6 +64,52 @@ claude
 
 启动后输入 `/mcp` 可查看所有 MCP 工具状态。
 
+## 🔐 全局配置第三方 API Key（关键）
+
+如果你需要使用第三方网关（自定义 `BASE_URL` + `AUTH_TOKEN`），建议使用以下方式做**全局配置**，确保在任意项目、任意终端里启动 Claude Code 都生效。
+
+### 1. 全局配置新的 API Key（首次设置）
+
+```bash
+BASE_URL="YOUR_URL"
+AUTH_TOKEN="YOUR_API_KEY"
+
+touch ~/.zshenv
+
+grep -q '^export ANTHROPIC_BASE_URL=' ~/.zshenv \
+  && sed -i '' "s|^export ANTHROPIC_BASE_URL=.*|export ANTHROPIC_BASE_URL=\"${BASE_URL}\"|" ~/.zshenv \
+  || echo "export ANTHROPIC_BASE_URL=\"${BASE_URL}\"" >> ~/.zshenv
+
+grep -q '^export ANTHROPIC_AUTH_TOKEN=' ~/.zshenv \
+  && sed -i '' "s|^export ANTHROPIC_AUTH_TOKEN=.*|export ANTHROPIC_AUTH_TOKEN=\"${AUTH_TOKEN}\"|" ~/.zshenv \
+  || echo "export ANTHROPIC_AUTH_TOKEN=\"${AUTH_TOKEN}\"" >> ~/.zshenv
+
+source ~/.zshenv
+launchctl setenv ANTHROPIC_BASE_URL "${BASE_URL}"
+launchctl setenv ANTHROPIC_AUTH_TOKEN "${AUTH_TOKEN}"
+```
+
+### 2. 一键修改 API Key（后续换 Key）
+
+```bash
+NEW_BASE_URL="YOUR_NEW_URL"
+NEW_AUTH_TOKEN="YOUR_NEW_API_KEY"
+
+sed -i '' "s|^export ANTHROPIC_BASE_URL=.*|export ANTHROPIC_BASE_URL=\"${NEW_BASE_URL}\"|" ~/.zshenv
+sed -i '' "s|^export ANTHROPIC_AUTH_TOKEN=.*|export ANTHROPIC_AUTH_TOKEN=\"${NEW_AUTH_TOKEN}\"|" ~/.zshenv
+
+source ~/.zshenv
+launchctl setenv ANTHROPIC_BASE_URL "${NEW_BASE_URL}"
+launchctl setenv ANTHROPIC_AUTH_TOKEN "${NEW_AUTH_TOKEN}"
+```
+
+验证（新开终端后）：
+
+```bash
+echo "$ANTHROPIC_BASE_URL"
+echo "${ANTHROPIC_AUTH_TOKEN:0:8}********"
+```
+
 ## 🗑️ 卸载方法（仅卸载 Claude Code + MCP）
 
 本仓库提供卸载脚本：`claude_code_oneclick_uninstall.sh`
