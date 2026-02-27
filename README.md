@@ -12,12 +12,12 @@
 - **Python 3** - Python 运行时（通过 uv 安装，官方推荐方式）
 - **uv / uvx** - Python 工具链（Anthropic 官方推荐）
 
-**MCP 工具（全部来自 Anthropic 官方 modelcontextprotocol 仓库）：**
+**MCP 工具（官方来源）：**
 1. **playwright** - 控制浏览器：截图、填表、自动化网页操作
-2. **fetch** - 抓取任意网页内容给 Claude 阅读
-3. **filesystem** - 读写本地文件（授权目录：桌面 + 下载）
-4. **memory** - 跨会话持久记忆，Claude 能记住你的偏好
-5. **sequential-thinking** - 结构化思维拆解，帮助分析复杂问题
+2. **fetch** - 抓取任意网页内容给 Claude 阅读（`mcp-server-fetch`）
+3. **filesystem** - 读写本地文件（授权目录：桌面 + 下载，`@modelcontextprotocol/server-filesystem`）
+4. **memory** - 跨会话持久记忆，Claude 能记住你的偏好（`@modelcontextprotocol/server-memory`）
+5. **sequential-thinking** - 结构化思维拆解，帮助分析复杂问题（`@modelcontextprotocol/server-sequential-thinking`）
 
 **MCP 安装范围：**
 - **用户级（全局）**：安装后在任意项目、任意终端启动 Claude Code 都可用
@@ -107,10 +107,9 @@ A: 大部分情况下，关闭终端重新打开后再运行脚本即可解决�
 A: 检查代理设置或 DNS 配置。如果使用代理，确保代理正常工作。
 
 **Q: 如何卸载？**
-A: 可以使用 Homebrew 卸载相关工具：
+A: 使用本仓库提供的卸载脚本即可（仅移除 Claude Code 和 MCP，不卸载依赖）：
 ```bash
-brew uninstall node
-brew uninstall --cask claude
+./claude_code_oneclick_uninstall.sh
 ```
 
 ## 📝 许可证
