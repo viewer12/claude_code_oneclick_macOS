@@ -58,6 +58,26 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 # ── PATH 工具 ──────────────────────────────────────────────────────────────
 
+ensure_block_in_file() {
+  local file="$1"
+  local marker_start="$2"
+  local line="$3"
+  local marker_end="$4"
+  [ -f "$file" ] || touch "$file"
+  if ! grep -qF "$marker_start" "$file" 2>/dev/null; then
+    printf '\n%s\n%s\n%s\n' "$marker_start" "$line" "$marker_end" >> "$file"
+    return 0
+  fi
+  return 1
+}
+
+all_shell_rc_files=(
+  "$HOME/.zprofile"
+  "$HOME/.zshrc"
+  "$HOME/.bash_profile"
+  "$HOME/.bashrc"
+)
+
 inject_brew_shellenv() {
   if [[ -x "/opt/homebrew/bin/brew" ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -290,19 +310,11 @@ persist_brew_shellenv() {
     shellenv_cmd='eval "$(/usr/local/bin/brew shellenv)"'
   fi
   local marker="# >>> brew shellenv（claude_code_oneclick_final.sh 自动添加）"
-  local block
-  block="$(printf '%s\n%s\n%s\n' "$marker" "$shellenv_cmd" '# <<< brew shellenv')"
-  local targets
-  targets="$HOME/.zprofile"
-  if [[ "${SHELL:-}" == */bash ]]; then
-    targets="$targets $HOME/.bash_profile"
-  fi
+  local marker_end="# <<< brew shellenv"
   local f
-  for f in $targets; do
-    [ -f "$f" ] || touch "$f"
-    if ! grep -qF "$marker" "$f" 2>/dev/null; then
+  for f in "${all_shell_rc_files[@]}"; do
+    if ensure_block_in_file "$f" "$marker" "$shellenv_cmd" "$marker_end"; then
       info "写入 Homebrew PATH 到：$f"
-      printf '\n%s\n' "$block" >> "$f"
     else
       info "Homebrew PATH 已存在，跳过：$f"
     fi
@@ -366,23 +378,6 @@ ensure_uv_and_python() {
     retry 3 5 bash -c 'curl -fsSL https://astral.sh/uv/install.sh | bash'
     inject_uv_path
 
-    # 将 ~/.local/bin 写入 shell 配置，确保重开终端后也能用
-    local uv_marker="# >>> uv PATH（claude_code_oneclick_final.sh 自动添加）"
-    local uv_line='export PATH="$HOME/.local/bin:$PATH"'
-    local targets
-    targets="$HOME/.zprofile"
-    if [[ "${SHELL:-}" == */bash ]]; then
-      targets="$targets $HOME/.bash_profile"
-    fi
-    local f
-    for f in $targets; do
-      [ -f "$f" ] || touch "$f"
-      if ! grep -qF "$uv_marker" "$f" 2>/dev/null; then
-        printf '\n%s\n%s\n%s\n' "$uv_marker" "$uv_line" "# <<< uv PATH" >> "$f"
-        info "写入 uv PATH 到：$f"
-      fi
-    done
-
     if find_uvx_absolute >/dev/null 2>&1; then
       ok "uv 安装完成：$(find_uvx_absolute)"
     else
@@ -424,6 +419,18 @@ ensure_uv_and_python() {
     err "python3 不在 PATH 中，脚本内部依赖 python3 处理配置文件。请关闭终端重开后再试。"
     exit 3
   fi
+
+  # 无论 uv 是否刚安装，都确保 ~/.local/bin 在 bash/zsh 都会生效（claude 默认装在这里）。
+  local uv_marker="# >>> local bin PATH（claude_code_oneclick_final.sh 自动添加）"
+  local uv_line='export PATH="$HOME/.local/bin:$PATH"'
+  local uv_end="# <<< local bin PATH"
+  local f
+  info "确保 ~/.local/bin 对 bash 和 zsh 永久生效..."
+  for f in "${all_shell_rc_files[@]}"; do
+    if ensure_block_in_file "$f" "$uv_marker" "$uv_line" "$uv_end"; then
+      info "写入 local bin PATH 到：$f"
+    fi
+  done
 }
 
 install_or_update_claude() {
@@ -544,6 +551,18 @@ final_check_and_next() {
     warn "python3 暂不在 PATH 中，可重开终端后运行 python3 --version 验证。"
   fi
 
+  # 检查新开的登录 shell 是否也能找到 claude，避免脚本内可用但用户终端不可用。
+  if /bin/bash -lc 'command -v claude >/dev/null 2>&1'; then
+    ok "bash 登录环境：claude 可用"
+  else
+    warn "bash 登录环境：暂时找不到 claude"
+  fi
+  if /bin/zsh -lc 'command -v claude >/dev/null 2>&1'; then
+    ok "zsh 登录环境：claude 可用"
+  else
+    warn "zsh 登录环境：暂时找不到 claude"
+  fi
+
   if [ "$all_ok" = "false" ]; then
     err "部分工具不可用，请关闭终端重新打开后再运行本脚本。"
     exit 7
@@ -571,6 +590,13 @@ final_check_and_next() {
   echo "  claude"
   echo ""
   echo "启动后输入 /mcp 可查看所有 MCP 工具状态。"
+  echo ""
+  echo "如果当前终端提示 claude: command not found，请执行："
+  echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+  echo "  hash -r"
+  echo "或重载 shell 配置："
+  echo "  bash: source ~/.bash_profile"
+  echo "  zsh : source ~/.zprofile"
   ok "搞定，享受 Claude Code 吧！"
 }
 
